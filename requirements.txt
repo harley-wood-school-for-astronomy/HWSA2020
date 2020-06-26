@@ -1,3 +1,3 @@
-splotch==0.5.0.0
+splotch==0.4.6.9
 matplotlib==3.2.2
 numpy==1.19.0
