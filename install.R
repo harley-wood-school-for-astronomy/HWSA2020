@@ -9,3 +9,5 @@ devtools::install_github('obreschkow/cooltools')
 
 install.packages('IRkernel')
 install.packages('IRdisplay')
+
+IRkernel::installspec()
