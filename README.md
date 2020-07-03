@@ -99,7 +99,7 @@ Click here to launch the Binder environment (it may take a few minutes to load).
 Please note: all sessions of the school will be recorded. All participant cameras will be turned off by default.
 
 ### Rules:
-1. **Chat is only to be used for questions.** We will have LOC members monitoring the chat and recording questions, which will be asked during the scheduled question times.
+1. **Sli.do should be used for questions.** We will have LOC members monitoring the chat and recording questions, which will be asked during the scheduled question times. 
 2. **Please do not attempt to share your screen.**
 3. **Turn your video off if your connection is slow.** We recommend keeping your video off, a least during the sessions, to try and minimise the internet traffic.
 
