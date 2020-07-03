@@ -6,3 +6,6 @@ install.packages('extraDistr')
 
 install.packages('devtools')
 devtools::install_github('obreschkow/cooltools')
+
+install.packages('IRkernel')
+install.packages('IRdisplay')
