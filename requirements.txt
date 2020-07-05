@@ -4,3 +4,6 @@ mpi4py==3.0.3
 
 scipy==1.5.1
 astropy==4.0.1
+ipyparallel==6.3.0
+
+glob
