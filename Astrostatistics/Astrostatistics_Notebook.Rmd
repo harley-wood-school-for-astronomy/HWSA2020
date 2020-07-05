@@ -1,0 +1,302 @@
+---
+title: "Astrostatistics"
+author: "Danail Obreschkow, Harley Wood School of Astronomy"
+date: "`r Sys.Date()`"
+output: pdf_document
+classoption: a4paper
+---
+
+# Prerequisites
+
+Load libraries and set RNG seed for this chapter:
+```{r}
+library(magicaxis)
+library(pracma)
+suppressMessages(library(cooltools))
+suppressMessages(library(ellipse)) # for plotting covariance ellipses
+suppressMessages(library(extraDistr)) # for truncated Normal distribution
+set.seed(1)
+```
+
+
+# Foreword
+
+Why "astrostatistics"?
+
+* Data are expensive
+
+* Astronomical data is gathered by observation rather than experimentation.
+
+* Data are fundamentally finite
+
+In appreciation of these motivations, I decided to dedicate this lecture to the topic of statistical *inference*, which, in the most general sense, is the art of finding a theoretical model describing some empirical observations. More specifically, statistical inference is the mathematical way to distinguish between good and bad models and to determine the free parameters of a model, given some data.
+
+In general, statistical inference is an *inductive* process as opposed to a *deductive* one, since it relies on a *finite* sample of observations to determine a model that can normally describe *infinitely* many cases. It is therefore unavoidable to make some axiomatic assumptions to constrain the problem enough that deductive logic can be applied.
+
+A good example for the inductive nature of inference is the search for physical laws: all known physical laws rely on a finite set of observations, yet apply to a *continuity* of infinitely many situations. For instance, Johannes Kepler proposed his revolutionary laws of planetary motion from a number of discrete position measurements of Mars, using only very limited additional data from the other five ancient planets (including Earth), collected by Tycho Brahe over a couple of decades. Desipite this finite set of data, Kepler's laws are formulated, as if they applied to *any* conceivable planet in the solar system at *any* time in the past and future. This is, of course, a logical leap: in principle, the laws of physics could suddently change any day or behave differently for not-yet-discovered planets. Similarly, Brahe's data were not good enough to distinguish between $R^3\propto T^2$ (Kepler's third law) and $R^{3.001}\propto T^{1.999}$. These considerations make it clear that the general character and exact formulation of physical laws do *not* follow from the data, but from *metaphysical* principles, such as the idea that the Universe obeys some *simplicity* (see Occam's razor), that it is built upon special *symmetries* (e.g. homogeneity and isotropy of space-time) and that it follows a mathematical *beauty* (e.g. integer exponents in Kepler's case).
+
+In summary, statistical inference can rarely determine the optimal model for some data in a fully deductive way. A powerful mathematical framework for inference should, however, be able to distinguish between models that make different predictions regarding the actually observed data; and it should be able to account for prior knowledge about the 'true' model. The mathematical framework that most directly incorporates these features is the 'Bayesian' framework, as it allows us to assign *probabilities* to models/model parameters, given the data. This part of the course is entirely dedicated to this Bayesian framework and associated tools (e.g. maximum likelihood and maxiumum posterior estimates).
+
+\newpage
+
+# Bayesian inference
+
+The core idea of the Bayesian framework is to infer a model $M$ (or testing a hypothesis $H$) from a data set $D$ (also known as evidence $E$) by identifying the model and data with $A$ and $B$, respectively, in Bayes' theorem, $P(A|B)P(B)=P(B|A)P(A)$ (see part 3). We can thus write
+\begin{equation}
+  P(M|D)=\frac{P(D|M)P(M)}{P(D)},
+  \label{eq:bayesMD}
+\end{equation}
+where 
+
+* $P(D|M)$ is the conditional probability of the data given the model, known as the *likelihood*;
+
+* $P(M)$ is the *prior probability* (often just called the *prior*), encoding our knowledge about the model before considering the data;
+
+* $P(M|D)$ is the *posterior probability* (often just called the *posterior*), i.e. the probability of the model, accounting for the data *and* prior knowledge;
+
+* $P(D)$ is called the *marginal likelihood*, because it is obtained by integrating ('marginalising') $P(D|M)$ over all models.
+
+Since $P(D)$ does not depend on the model, it has no bearing on the *relative* probabilities of different models. It only acts as a normalisation function and is often dropped in calculations.
+
+In many practical cases, the model $M$ to be inferred from the data $D$ belongs to a discrete or continuous family of models, specified by one or multiple discrete/continuous parameters. For instance, we might like to fit a normal distribution with parameters $\mu$ (mean) and $\sigma$ (standard deviation) to some data points.
+
+In the case of such parameterized models, it is common to rewrite the likelihood as $$\mathcal{L}(\theta;D)\equiv P(D|\theta)$$ and consider $\mathcal{L}$ a function of $\theta$ at fixed $D$ rather than the other way around. As a consequence, $\mathcal{L}$ is not generally normalised, i.e. $\int\mathcal{L}\,d\theta\neq1$, unlike standard probability density functions (PDFs); hence the symbol $\mathcal{L}$ instead of $P$.
+
+The likelihood function *is the probability of the data $D$ assuming that the model is specified by the parameters $\theta$*, which is *not* to be confused with the probability of $\theta$ given $D$ (i.e. the *posterior*). This distinction is the reason that we use the semi-colon notation $(\theta;D)$ for the likelihood instead of the vertical bar $(\theta|D)$, normally reserved for conditional probabilities. Of course, in the scientific literature, all sorts of notations are used, so be prepared to get confused! It is also quite common to drop the data vector and simply write $\mathcal{L}(\theta)$.
+
+Following Bayes' theorem (Eq. \ref{eq:bayesMD}) the posterior is related to the likelihood via,
+$$P(\theta|D) \propto \mathcal{L}(\theta;D)P(\theta).$$
+Note that this equation uses a proportionality symbol instead of an equal symbol, because we have dropped the $\theta$-independent marginalized likelihood $P(D)$. It is understood that $P(\theta|D)$ has to be normalized, such that $\int P(\theta|D)\,d\theta=1$.
+
+### Example: spaceship emergency
+
+Imagine you are on a spaceship and you need to land this spaceship on a planet, as a matter of emergency. Only two planets (A and B) are within reach and for the landing site to be hard enough, it has to rain on less than 50% of the days, on average, on the planet. You need to pick the best planet based on very limited data:
+
+* On planet A it rained on 2 of 3 randomly observed days.
+* On planet B it rained on 6 of 10 randomly observed days.
+
+Which planet to you pick?
+
+One might naively intuit that planet B is the smart choice, since the data suggest that it rains more frequently on planet A than on planet B ($2/3\approx0.667$ vs $6/10=0.6$). However this answer is too quick. In fact, what we really need to compute are the probabilities for either planet to have rain on less than 50\% of all days. To do so let us first determine the likelihoods as a function of the fraction $r$ of rainy days:
+
+* $\mathcal{L}_A(r)=P(\text{2 of 3 rainy days}|r) = {3\choose2} r^2(1-r)$
+* $\mathcal{L}_B(r)=P(\text{6 of 10 rainy days}|r) = {10\choose6} r^6(1-r)^4$
+
+Assuming a flat prior on $r$, the posterior probability for the planets to have $r$ rainy days is proportional to these likelihoods, i.e.:
+
+* $P_A(r|D) = \frac{\mathcal{L}_A(r)}{\int_0^1 \mathcal{L}_A(r')dr'}$
+* $P_B(r|D) = \frac{\mathcal{L}_B(r)}{\int_0^1 \mathcal{L}_B(r')dr'}$
+
+Hence, the posterior probabilities for the planets to be 'good' (r<0.5) are given by
+
+* $P(A\text{ good}|D) = \int_0^{1/2}P_A(r|D)dr = \frac{\int_0^{1/2} r^2(1-r)dr}{\int_0^1 r^2(1-r)dr} = \frac{5}{16} = 0.3125$
+* $P(B\text{ good}|D) = \int_0^{1/2}P_B(r|D)dr = \frac{\int_0^{1/2} r^6(1-r)^4dr}{\int_0^1 r^6(1-r)^4dr} = \frac{281}{1024} = 0.2744141$
+
+Neither planet gives us particularly good chances of survival! However, given this analysis, it is clear that **planet A** has be be preferred, given no other information. The odds of planet A versus planet B are $$R=\frac{P(A\text{ good}|D)}{P(B\text{ good}|D)}\approx1.14.$$
+
+In **R**, we can forgo the analytical calculation and do everything numerically:
+
+```{r}
+likelihood.A = function(r) dbinom(2,3,r)
+likelihood.B = function(r) dbinom(6,10,r)
+
+posterior.A = function(r) likelihood.A(r)/integral(likelihood.A,0,1)
+posterior.B = function(r) likelihood.B(r)/integral(likelihood.B,0,1)
+
+P.A.good = integral(posterior.A,0,0.5)
+P.B.good = integral(posterior.B,0,0.5)
+
+print(P.A.good)
+print(P.B.good)
+```
+
+To sharpen our intuition for this problem let us plot the posteriors $P_A(r|D)$ and $P_B(r|D)$.
+
+```{r, out.width='70%', fig.align='center'}
+magcurve(posterior.A(x),xlim=c(0,1),ylim=c(0,3),xaxs='i',yaxs='i',
+         xlab='Fraction of rainy days r',ylab='Posterior P(r|data)',col='red')
+curve(posterior.B(x),col='blue',add=T)
+abline(v=c(2/3,6/10),col=c('red','blue'),lty=2)
+r = seq(0,0.5,length=100)
+polygon(c(r,rev(r)),c(posterior.A(r),r*0),col='#ff000030',border=NA)
+polygon(c(r,rev(r)),c(posterior.B(r),r*0),col='#0000ff30',border=NA)
+text(0.24,0.6,'Planet A',pos=2,col='red')
+text(0.47,2,'Planet B',pos=2,col='blue')
+```
+
+We see that while the mode of the posterior for planet B ($r=6/10=0.6$) is lower than for planet A ($r=2/3\approx0.667$), the integrated probability of good days ($r<0.5$) is nonetheless higher for planet A. Graphically, this can be seen from the fact that the shaded red region has a larger surface area than the shaded blue region.
+
+# Maximum likelihood estimation
+
+Often one is interested in a *point estimator*, that is a single model parameter $\hat\theta$ which 'best' describes the data in some sense. The most commonly used point estimator is the so-called *maximum likelihood estimator (MLE)*, defined as the parameter $\theta$ that maximises the likelihood:
+
+\begin{equation}
+  \hat\theta_{\rm MLE} = \underset{\theta}{\arg\max}\,\mathcal{L}(\theta|D).
+  \label{eq:MLE}
+\end{equation}
+
+The MLE owes its importance to the fact, that it represents the most probable model parameter(s), given a flat prior, $P(\theta)=\rm const$, as a direct consequence of Bayes theorem. As detailed by Kendall \& Stuart (1979, ``The Advanced Theory of Statistics''), the MLE has three remarkable asymptotic properties which make it a powerful statistical tool. As the sample size becomes increasingly large, the MLE becomes a *consistent* (i.e. its expectation converges),  *minimum-variance estimator* and *normally distributed estimator*.
+
+It is generally convenient to work with its natural logarithm, called the *log-likelihood*,
+\begin{equation}
+  \ell(\theta;D)\equiv\ln\mathcal{L}(\theta;D).
+\end{equation}
+The logarithm conveniently transforms the product of probabilities into sums of log-probabilities. 
+
+Since the logarithm is a monotonic function, a maximum of $\mathcal{L}$ is also a maximum of $\ell$ and vice versa. Hence, $\hat\theta_{\rm MLE}$ can be obtained either through maximising $\mathcal{L}$ or $\ell$.
+
+### Example: fitting a black-body spectrum
+
+Let us now consider an example of a multivariate inference problem, i.e. a problem where we aim to constrain multiple (here two) parameters simultaneously from the same data.
+
+A thermal source of light is observed in three different colour filters. For simplicity, these filters are assumed to be perfect narrow band filters, which are fully transparent in a small wavelength range $\Delta\lambda=0.1\rm nm$, centred at a wavelength $\lambda_i$, and totally opaque at all other wavelengths. The data obtained through the three filters is summarised in Tab. 2.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lllc}
+\hline
+Colour & Wavelength $\lambda_i$ & Photon counts $x_i$ \\ \hline
+UV & 281 & 9 \\
+blue & 446 & 18 \\
+red & 641 & 11 \\ \hline
+\end{tabular}
+\caption{Narrow band filter data used for black-body SED fitting.}
+\end{table}
+
+Assuming a black-body, the energy radiated per unit wavelength over the duration of the measurement, the so-called `spectral energy distribution' (SED), is given by the Planck law
+\begin{equation}
+  F(\lambda;T,A) =\frac{10^{-40}{\rm J m^4}A}{\lambda^5}\frac{1}{ e^{\frac{hc}{\lambda k_{\rm B}T}} - 1}~~\rm[J/m],
+\end{equation}
+where $h$ is the Planck constant, $c$ is the speed of light and $k_{\rm B}$ is the Boltzmann constant. The model has two parameters: the temperature $T$ and an amplitude $A$, which depends on the geometry and the quantum efficiency of the system, as well as on the duration of the measurement. We assume that $A$ is independent of the wavelength. The constant $10^{-40}\rm J m^4$ is an arbitrary scaling factor to make $A$ dimensionless and avoid very small values, which could lead to some unnecessary numerical difficulties. Our goal is to determine the most likely values of $T$ and $A$ and their uncertainties. Throughout this exercise we assume that the spectrum of the thermal source is constant over the small bandpass $\Delta\lambda$ of the filters.
+
+Let's first write down the likelihood for a single narrow band filter $i$: The probability $P_i$ of observing $x_i$ photons at wavelength $\lambda_i\pm\Delta\lambda/2$ is given by the Poisson statistics $$\mathcal{L}_i(T,A;x_i) = P_i(x_i|T,A) = \frac{k_i^{x_i}e^{-k_i}}{x_i!},$$ where $k_i$ is the expected number of photons (of energy $E=hc/\lambda_i$) seen through the filter centred at $\lambda_i$, $$k_i=\Delta\lambda\cdot F(\lambda_i;T,A)\cdot\frac{\lambda_i}{hc},$$ which is dimensionless as required.
+
+Hence, the total log-likelihood function becomes
+\begin{equation}
+  \ell(T,A) = \sum_{i=1}^3 \left[x_i\ln(k_i)-k_i-\ln(x_i!)\right],
+\end{equation}
+where the terms $\ln(x_i!)$ do not depend on the model parameters $T$ and $A$. Therefore, the maximum point and the derivatives of $\ell$ are the same as those of the effective log-likelihood
+\begin{equation}\label{eq:loglspect}
+  \tilde\ell(T,A) = \sum_{i=1}^3 \left[x_i\ln(k_i)-k_i\right].
+\end{equation}
+
+It is possible to make some analytical progress towards finding the maximum point $(\hat T,\hat A)$ of $\tilde\ell(T,A)$. However, Eq. (\ref{eq:loglspect}) lends itself to numerical optimisation. In **R**, this becomes
+
+```{r}
+# initialise data and constants
+data.wavelength = c(281,446,641) # [nm] values of lambda_i
+data.counts = c(9,18,11) # values of x_i
+c = 299792458 # [m/s] speed of light
+h = 6.62607004e-34 # [m^2 kg/s] Planck's constant
+k = 1.38064852e-23 # [m^2 kg/s^2/K] Boltzmann constant
+dlambda = 1e-10 # [m] filter band width
+
+# Planck law in energy/wavelength [J/m]
+planck = function(lambda,temperature,A) {
+  return(1e-40*max(0,A)*lambda^(-5)/(exp(h*c/(lambda*k*temperature))-1))
+}
+
+# Planck law in photons/Delta lambda
+planck.photons = function(lambda,temperature,A) {
+  dlambda*lambda/h/c*planck(lambda,temperature,A)
+}
+
+# likelihood
+log.likelihood = function(p) { # p = (temperature,A)
+  k = planck.photons(data.wavelength*1e-9,p[1],p[2])
+  return(sum(data.counts*log(k+1e-99)-k)) # the constant 1e-99 avoids problems if k=0
+}
+
+# maximise likelihood
+p.initial = c(1e4,10)
+fit = optim(p.initial, log.likelihood, hessian=TRUE, control=list(fnscale=-1))
+T.mle = fit$par[1]
+A.mle = fit$par[2]
+cat(sprintf('MLE solution: T = %.3eK, A = %.3e\n',T.mle,A.mle))
+```
+
+We have used the in-built **optim** function to maximise the likelihood. A detailed discussion of this function was given in part 2 of this course.
+
+Let us now plot the most likely SED together with the data points and their Poisson uncertainties.
+
+```{r, out.width='70%', fig.align='center'}
+lambda.nm = seq(1,1000,by=2) # [nm]
+magplot(lambda.nm,dlambda*lambda.nm*1e-9/c/h*planck(lambda.nm*1e-9,T.mle,A.mle),
+        pch=20,cex=0.5,ylim=c(0,25),col=wavelength2col(lambda.nm),
+        xlab='Wavelength [nm]', ylab='Photon counts')
+points(data.wavelength,data.counts,pch=20,cex=1.5) # data points
+segments(data.wavelength,
+         y0=qpois(0.16,data.counts),y1=qpois(0.84,data.counts)) # 16%-84% uncertainties
+```
+
+# Model parameter uncertainties
+
+We now turn to the problem of estimating the statistical uncertainty of the MLE.
+
+In general, $\ell(\theta;\mathbf{x})$ can be a complicated function of $\theta$. However, it is generally true that the lowest-order non-vanishing approximation of its shape around the absolute maximum $\hat\theta_{\rm MLE}$ is the second order term in the Taylor expansion. If $\theta$ is a single parameter,
+\begin{equation}\label{eq:loglexpainsion}
+  \ell(\theta;\mathbf{x}) = \ell(\hat\theta_{\rm MLE};\mathbf{x})-\tfrac{1}{2}\sigma^{-2}(\theta-\hat\theta_{\rm MLE})^2+\mathcal{O}\big((\theta-\hat\theta_{\rm MLE})^3\big),
+\end{equation}
+where, for the moment, $-\sigma^{-2}$ is just a funny way of writing the second-order Taylor coefficient, computed as
+\begin{equation}
+  -\sigma^{-2} = \left.\frac{d^2\ell{(\theta;\mathbf{x})}}{d\theta^2}\right|_{\theta=\hat\theta_{\rm MLE}}
+\end{equation}
+
+Since the second derivative at the maximum point is always negative, $\sigma$ is a well-defined positive real. This parabolic approximation of $\ell$ corresponds to the Gaussian approximation
+\begin{equation}
+  \mathcal{L}(\theta;\mathbf{x}) \approx \mathcal{L}(\hat\theta_{\rm MLE};\mathbf{x})\exp\left(-\frac{(\theta-\hat\theta_{\rm MLE})^2}{2\sigma^2}\right)
+\end{equation}
+with standard deviation $\sigma$ (hence use of the symbol $-\sigma^{-2}$ in Eq. \ref{eq:loglexpainsion}). By normalising this Gaussian, we obtain the normal parameter PDF (assuming a flat prior $P(\theta)=\rm constant$),
+\begin{equation}
+  P(\theta|\mathbf{x}) \approx \frac{1}{\sqrt{2\pi}\sigma}\exp\left(-\frac{(\theta-\hat\theta_{\rm MLE})^2}{2\sigma^2}\right).
+\end{equation}
+
+This approximation of the model uncertainty is known as the *Laplace approximation*. This normal approximation of $\mathcal{L}$ often works surprisingly well in real examples as a consequence of the CLT.
+
+The extension of the Laplace approximation to multivariate likelihood functions, i.e. where $\theta$ is a vector of parameters, is straightforward. In this case the covariance of the model parameters at the MLE solution is given by
+\begin{equation}
+  \Sigma = -\mathcal{H}(\hat\theta_{\rm MLE})^{-1},
+\end{equation}
+where $\mathcal{H}$ is the *Hessian matrix*,
+\begin{equation}
+  \mathcal{H}_{ij}(\theta) = \frac{\partial^2\ell{(\theta;\mathbf{x})}}{\partial\theta_i\partial\theta_j}.
+\end{equation}
+
+Since $\mathcal{H}(\hat\theta_{\rm MLE})$ is a symmetric negative-definite matrix, the covariance exists and is a symmetric and positive-definite matrix, as it must be.
+
+### Example: fitting a black-body spectrum (continued)
+
+The parameter covariance in the Laplace approximation can be obtained from the Hessian, which is computed directly by **optim** if the argument *hessian=TRUE* is set.
+
+```{r, out.width='70%', fig.align='center'}
+# plot MLE solution
+xlim = c(5e3,1.3e4) # needed again later
+ylim = c(0,2.5e3) # needed again later
+magplot(T.mle,A.mle,xlim=xlim,ylim=ylim,pch=20,xaxs='i',yaxs='i',
+        xlab='Temperature T [K]', ylab='Amplitude A')
+
+# Laplace approximation
+covariance = -solve(fit$hessian)
+lines(ellipse(covariance,centre=c(T.mle,A.mle),level=0.68)) # 1-sigma region
+lines(ellipse(covariance,centre=c(T.mle,A.mle),level=0.95),lty=2) # 2-sigma region
+T.sd = sqrt(covariance[1,1])
+A.sd = sqrt(covariance[2,2])
+segments(T.mle-T.sd, A.mle, T.mle+T.sd)
+segments(T.mle, A.mle-A.sd, y1=A.mle+A.sd)
+
+# Full posterior
+n.grid = 150
+x.range = seq(xlim[1],xlim[2],len=n.grid)
+y.range = seq(ylim[1],ylim[2],len=n.grid)
+z = array(NA,c(n.grid,n.grid))
+for (i in 1:n.grid) {
+  for (j in 1:n.grid) z[i,j] = log.likelihood(c(x.range[i],y.range[j]))
+}
+z = exp(z)
+contour(x.range,y.range,z,levels=contourlevel(z,c(0.68,0.95)), lty=c(1,2),
+        drawlabels=FALSE, add=TRUE, col='magenta')
+```
+
+Note that the 2-$\sigma$ ellipse of the Laplace approximation reaches to $A<0$, which is clearly unphysical. For more accurate posteriors, we need to consider the full likelihood and identify the minimal regions that contain 68\% and 95\% of the probability mass, respectively. In this example, this can be done numerically on a grid (magenta). In general, higher-dimensional problems, more sophisticated techniques are required (e.g. MCMC), which usually produce a sample representing the posterior (see later in this course).
+
+# Imortant resources

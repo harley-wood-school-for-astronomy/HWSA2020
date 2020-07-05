@@ -1,8 +1,6 @@
-splotch==0.4.6.9
 matplotlib==3.2.2
 numpy==1.19.0
 
-watermark==2.0.2
-
 scipy==1.5.1
 astropy==4.0.1
+ipyparallel==6.3.0
