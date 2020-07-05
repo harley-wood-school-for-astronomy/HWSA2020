@@ -11,4 +11,5 @@ Attendee pre-requesites:
 Software pre-requisites:
 * python3.6+
 * numpy
+* matplotlib
 * mpi4py
