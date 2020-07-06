@@ -1,52 +1,58 @@
 ---
 title: "Astrostatistics"
-author: "Danail Obreschkow, Harley Wood School of Astronomy"
-date: "`r Sys.Date()`"
+author: "Danail Obreschkow"
+date: "Harley Wood School of Astronomy, 6 July 2020"
 output: pdf_document
 classoption: a4paper
 ---
 
-# Prerequisites
+## Prerequisites
 
-Load libraries and set RNG seed for this chapter:
+This markdown document supports a 1-hour lecture on Astrostatistics focussed on Bayesian inference. The lecture was targeted to higher-degree research students in astronomy and cosmology.
+
+You will need some familiarity with the programming language **R** to run this markdown document interactively. I recommend using **R** version 4.x with **RStudio** 1.3.x (or later). They are both available for free on all common operating systems. If you have not used **R** before, I recommend the introductory videos by Aaron Robotham available online (https://www.youtube.com/watch?v=EDhDwz4uoJ8).
+
+In order to compile this document requires a series of packages listed below. Normally these packages are installed automatically upon opening the markdown document in **Rstudio**. Otherwise you can install them manually using the **install.packages** command:
+```{r, eval=F}
+install.packages(c('magicaxis','pracma','ellipse','hyper.fit'))
+```
+
+The only exception is the **cooltools** package, which is not yet on CRAN (the ``Central R Archive Network''), but can be downloaded from github using the **devtools** package:
+```{r, eval=F}
+install.packages('devtools')
+library(devtools)
+install_github('obreschkow/cooltools')
+```
+
+Load required libraries:
 ```{r}
 library(magicaxis)
 library(pracma)
 suppressMessages(library(cooltools))
-suppressMessages(library(ellipse)) # for plotting covariance ellipses
-suppressMessages(library(extraDistr)) # for truncated Normal distribution
-set.seed(1)
+suppressMessages(library(ellipse))
+suppressMessages(library(hyper.fit))
 ```
 
 
-# Foreword
+## Foreword: "Astrostatistics" -- is this really a thing?
 
-Why "astrostatistics"?
+Astrostatistics is not a new type of statistics, unlike, say, statistical physics. The term "astrostatistics" rather denotes the set of statistical tools regularly involved in the analysis of astronomical and cosmological data. These tools include spatial statistics, time series analysis, multivariate regression and, especially, Bayesian inference. The reason that astrostatistics has nonetheless become a recognized term is that statistics appears to be (even) more important in astronomy and cosmology than in most other fields of science. There are at least three good reasons for this:
 
-* Data are expensive
+* Astronomical data are generally very expensive in terms of the time, expertise and financial resources required to gather them. Because of this high price, it is often economical to invest a considerable effort into statistical analysis tools that allow us to extract the last bit of information contained in the data.
 
-* Astronomical data is gathered by observation rather than experimentation.
+* Astronomical evidence must rely on *observations* of the universe as it is, rather than on simplified control *experiments* normally conducted in other natural sciences. This makes astronomical data inevitably contaminated by unintended effects, such as noise from foreground/background objects, the cosmic environment of the objects studied, etc. Powerful statistical methods are normally needed to extract the relevant information from all this natural contamination.
 
-* Data are fundamentally finite
+* Astronomical data are fundamentally limited by the finite size and lifetime of the observable universe. Regardless of how strong our observational tools are, we will always be limited by this horizon. For instance, we only ever get to see one realization of the cosmic microwave background (CMB); it is impossible to add more large-scale modes by observing the CMB longer or better. Extracting the maximum information from the finite number of modes/objects is therefore often our only hope to constrain fundamental theories.
 
-In appreciation of these motivations, I decided to dedicate this lecture to the topic of statistical *inference*, which, in the most general sense, is the art of finding a theoretical model describing some empirical observations. More specifically, statistical inference is the mathematical way to distinguish between good and bad models and to determine the free parameters of a model, given some data.
+In appreciation of these motivations, I decided to dedicate this lecture on "Astrostatistics" to the much more narrow topic of statistical *inference* in astronomy, which, in the most general sense, is the art of finding a theoretical model describing a finite set of empirical observations. More specifically, statistical inference is the mathematical way to distinguish between good and bad models and to determine the free parameters of a model, given some data.
 
-In general, statistical inference is an *inductive* process as opposed to a *deductive* one, since it relies on a *finite* sample of observations to determine a model that can normally describe *infinitely* many cases. It is therefore unavoidable to make some axiomatic assumptions to constrain the problem enough that deductive logic can be applied.
+It is important to caution that statistical inference in (astro)physics is generally an *inductive* process as opposed to a *deductive* one, since it relies on a *finite* sample of observations to determine a model that can normally describe *infinitely* many cases. This is particularly true for the construction of physical laws, which strive to be universally applicable, but always rely on a limited set of observations, taken over a finite duration. For the inference problem to become solvable, it is therefore inevitable to invoke some *metaphysical* principles, such as the idea that the Universe obeys some *simplicity* (see Occam's razor), that it is built upon special *symmetries* (e.g. homogeneity and isotropy of space-time) and/or that it follows a mathematical *beauty*.
 
-A good example for the inductive nature of inference is the search for physical laws: all known physical laws rely on a finite set of observations, yet apply to a *continuity* of infinitely many situations. For instance, Johannes Kepler proposed his revolutionary laws of planetary motion from a number of discrete position measurements of Mars, using only very limited additional data from the other five ancient planets (including Earth), collected by Tycho Brahe over a couple of decades. Desipite this finite set of data, Kepler's laws are formulated, as if they applied to *any* conceivable planet in the solar system at *any* time in the past and future. This is, of course, a logical leap: in principle, the laws of physics could suddently change any day or behave differently for not-yet-discovered planets. Similarly, Brahe's data were not good enough to distinguish between $R^3\propto T^2$ (Kepler's third law) and $R^{3.001}\propto T^{1.999}$. These considerations make it clear that the general character and exact formulation of physical laws do *not* follow from the data, but from *metaphysical* principles, such as the idea that the Universe obeys some *simplicity* (see Occam's razor), that it is built upon special *symmetries* (e.g. homogeneity and isotropy of space-time) and that it follows a mathematical *beauty* (e.g. integer exponents in Kepler's case).
+A powerful mathematical framework for inference should, however, be able to distinguish between models that make different predictions regarding the actually observed data; and it should be able to account for prior knowledge about the 'true' model. The mathematical framework that most directly incorporates these features is the 'Bayesian' framework, as it allows us to assign *probabilities* to models/model parameters, given the data. This lecture is therefore focussed on Bayesian inference and associated tools, such as maximum likelihood estimation, maximum posterior estimates, and Laplace approximation.
 
-In summary, statistical inference can rarely determine the optimal model for some data in a fully deductive way. A powerful mathematical framework for inference should, however, be able to distinguish between models that make different predictions regarding the actually observed data; and it should be able to account for prior knowledge about the 'true' model. The mathematical framework that most directly incorporates these features is the 'Bayesian' framework, as it allows us to assign *probabilities* to models/model parameters, given the data. This part of the course is entirely dedicated to this Bayesian framework and associated tools (e.g. maximum likelihood and maxiumum posterior estimates).
+## Bayes theorem
 
-\newpage
-
-# Bayesian inference
-
-The core idea of the Bayesian framework is to infer a model $M$ (or testing a hypothesis $H$) from a data set $D$ (also known as evidence $E$) by identifying the model and data with $A$ and $B$, respectively, in Bayes' theorem, $P(A|B)P(B)=P(B|A)P(A)$ (see part 3). We can thus write
-\begin{equation}
-  P(M|D)=\frac{P(D|M)P(M)}{P(D)},
-  \label{eq:bayesMD}
-\end{equation}
-where 
+The core idea of the Bayesian framework is to infer a *model* $M$ (or testing a *hypothesis* $H$) from some *data* $D$ (also known as *evidence* $E$) by identifying the model and data with $A$ and $B$, respectively, in Bayes' theorem, $P(A|B)P(B)=P(B|A)P(A)$. We can thus write $$P(M|D)=\frac{P(D|M)P(M)}{P(D)},$$ where 
 
 * $P(D|M)$ is the conditional probability of the data given the model, known as the *likelihood*;
 
@@ -58,86 +64,42 @@ where
 
 Since $P(D)$ does not depend on the model, it has no bearing on the *relative* probabilities of different models. It only acts as a normalisation function and is often dropped in calculations.
 
-In many practical cases, the model $M$ to be inferred from the data $D$ belongs to a discrete or continuous family of models, specified by one or multiple discrete/continuous parameters. For instance, we might like to fit a normal distribution with parameters $\mu$ (mean) and $\sigma$ (standard deviation) to some data points.
+## Example 1: Rare Disease
 
-In the case of such parameterized models, it is common to rewrite the likelihood as $$\mathcal{L}(\theta;D)\equiv P(D|\theta)$$ and consider $\mathcal{L}$ a function of $\theta$ at fixed $D$ rather than the other way around. As a consequence, $\mathcal{L}$ is not generally normalised, i.e. $\int\mathcal{L}\,d\theta\neq1$, unlike standard probability density functions (PDFs); hence the symbol $\mathcal{L}$ instead of $P$.
+As an example, let us consider the case of a rare disease, which has infected 0.1% of the population. A test is available that is 99.9% (99%) accurate at correctly determining positive (negative) patients. Your test is positive. What is the probability that you have the disease? Using Bayes theorem this probability can be computed as follows
+$$
+P(\text{sick}|\text{test+}) = \frac{P(\text{test+}|\text{sick})P(\text{sick})}{P(\text{test+})} = \frac{P(\text{test+}|\text{sick})P(\text{sick})}{P(\text{test+}|\text{sick})P(\text{sick})+P(\text{test+}|\text{healthy})P(\text{healthy})}
+$$
+$$
+P(\text{sick}|\text{test+}) = \frac{0.999\cdot0.001}{0.999\cdot0.001+0.01\cdot0.999} = \frac{1}{11}
+$$
+Thus, even though you tested positively, it is quite unlikely that you have the disease. This might seem counter-intuitive given the high accuracy of the test, but the small value of the prior dominates over this accuracy.
+
+## Parameterized models
+
+Often the model $M$ to be inferred from the data $D$ belongs to a discrete or continuous family of models, specified by one or multiple discrete/continuous parameters. In this case it is common to rewrite the likelihood as $$\mathcal{L}(\theta;D)\equiv P(D|\theta)$$ and consider $\mathcal{L}$ a function of $\theta$ at fixed $D$ rather than the other way around. As a consequence, $\mathcal{L}$ is not generally normalised, i.e. $\int\mathcal{L}\,d\theta\neq1$, unlike standard probability density functions (PDFs); hence the symbol $\mathcal{L}$ instead of $P$.
 
 The likelihood function *is the probability of the data $D$ assuming that the model is specified by the parameters $\theta$*, which is *not* to be confused with the probability of $\theta$ given $D$ (i.e. the *posterior*). This distinction is the reason that we use the semi-colon notation $(\theta;D)$ for the likelihood instead of the vertical bar $(\theta|D)$, normally reserved for conditional probabilities. Of course, in the scientific literature, all sorts of notations are used, so be prepared to get confused! It is also quite common to drop the data vector and simply write $\mathcal{L}(\theta)$.
 
-Following Bayes' theorem (Eq. \ref{eq:bayesMD}) the posterior is related to the likelihood via,
+Following Bayes' theorem, the posterior is related to the likelihood via
 $$P(\theta|D) \propto \mathcal{L}(\theta;D)P(\theta).$$
-Note that this equation uses a proportionality symbol instead of an equal symbol, because we have dropped the $\theta$-independent marginalized likelihood $P(D)$. It is understood that $P(\theta|D)$ has to be normalized, such that $\int P(\theta|D)\,d\theta=1$.
+Note that this equation uses a proportionality symbol instead of an equal sign, because we have dropped the $\theta$-independent marginalized likelihood $P(D)$. It is understood that $P(\theta|D)$ has to be normalized, such that $\int P(\theta|D)\,d\theta=1$.
 
-### Example: spaceship emergency
+## Point estimators
 
-Imagine you are on a spaceship and you need to land this spaceship on a planet, as a matter of emergency. Only two planets (A and B) are within reach and for the landing site to be hard enough, it has to rain on less than 50% of the days, on average, on the planet. You need to pick the best planet based on very limited data:
+Often one is interested in a *point estimator*, that is a single model parameter $\hat\theta$ which optimally describes the data (given a certain form of the model). Following the parameterized notation of Bayes' theorem, the most natural point estimator is the parameter $\theta$, which maximises the posterior probability distribution $P(\theta|D)$. This parameter is known as the *maximum a posteriori (MAP)* estimator,
+\begin{equation}
+  \hat\theta_{\rm MAP} = \underset{\theta}{\arg\max}\,\mathcal{L}(\theta;D) P(\theta).
+  \label{eq:MAP}
+\end{equation}
 
-* On planet A it rained on 2 of 3 randomly observed days.
-* On planet B it rained on 6 of 10 randomly observed days.
-
-Which planet to you pick?
-
-One might naively intuit that planet B is the smart choice, since the data suggest that it rains more frequently on planet A than on planet B ($2/3\approx0.667$ vs $6/10=0.6$). However this answer is too quick. In fact, what we really need to compute are the probabilities for either planet to have rain on less than 50\% of all days. To do so let us first determine the likelihoods as a function of the fraction $r$ of rainy days:
-
-* $\mathcal{L}_A(r)=P(\text{2 of 3 rainy days}|r) = {3\choose2} r^2(1-r)$
-* $\mathcal{L}_B(r)=P(\text{6 of 10 rainy days}|r) = {10\choose6} r^6(1-r)^4$
-
-Assuming a flat prior on $r$, the posterior probability for the planets to have $r$ rainy days is proportional to these likelihoods, i.e.:
-
-* $P_A(r|D) = \frac{\mathcal{L}_A(r)}{\int_0^1 \mathcal{L}_A(r')dr'}$
-* $P_B(r|D) = \frac{\mathcal{L}_B(r)}{\int_0^1 \mathcal{L}_B(r')dr'}$
-
-Hence, the posterior probabilities for the planets to be 'good' (r<0.5) are given by
-
-* $P(A\text{ good}|D) = \int_0^{1/2}P_A(r|D)dr = \frac{\int_0^{1/2} r^2(1-r)dr}{\int_0^1 r^2(1-r)dr} = \frac{5}{16} = 0.3125$
-* $P(B\text{ good}|D) = \int_0^{1/2}P_B(r|D)dr = \frac{\int_0^{1/2} r^6(1-r)^4dr}{\int_0^1 r^6(1-r)^4dr} = \frac{281}{1024} = 0.2744141$
-
-Neither planet gives us particularly good chances of survival! However, given this analysis, it is clear that **planet A** has be be preferred, given no other information. The odds of planet A versus planet B are $$R=\frac{P(A\text{ good}|D)}{P(B\text{ good}|D)}\approx1.14.$$
-
-In **R**, we can forgo the analytical calculation and do everything numerically:
-
-```{r}
-likelihood.A = function(r) dbinom(2,3,r)
-likelihood.B = function(r) dbinom(6,10,r)
-
-posterior.A = function(r) likelihood.A(r)/integral(likelihood.A,0,1)
-posterior.B = function(r) likelihood.B(r)/integral(likelihood.B,0,1)
-
-P.A.good = integral(posterior.A,0,0.5)
-P.B.good = integral(posterior.B,0,0.5)
-
-print(P.A.good)
-print(P.B.good)
-```
-
-To sharpen our intuition for this problem let us plot the posteriors $P_A(r|D)$ and $P_B(r|D)$.
-
-```{r, out.width='70%', fig.align='center'}
-magcurve(posterior.A(x),xlim=c(0,1),ylim=c(0,3),xaxs='i',yaxs='i',
-         xlab='Fraction of rainy days r',ylab='Posterior P(r|data)',col='red')
-curve(posterior.B(x),col='blue',add=T)
-abline(v=c(2/3,6/10),col=c('red','blue'),lty=2)
-r = seq(0,0.5,length=100)
-polygon(c(r,rev(r)),c(posterior.A(r),r*0),col='#ff000030',border=NA)
-polygon(c(r,rev(r)),c(posterior.B(r),r*0),col='#0000ff30',border=NA)
-text(0.24,0.6,'Planet A',pos=2,col='red')
-text(0.47,2,'Planet B',pos=2,col='blue')
-```
-
-We see that while the mode of the posterior for planet B ($r=6/10=0.6$) is lower than for planet A ($r=2/3\approx0.667$), the integrated probability of good days ($r<0.5$) is nonetheless higher for planet A. Graphically, this can be seen from the fact that the shaded red region has a larger surface area than the shaded blue region.
-
-# Maximum likelihood estimation
-
-Often one is interested in a *point estimator*, that is a single model parameter $\hat\theta$ which 'best' describes the data in some sense. The most commonly used point estimator is the so-called *maximum likelihood estimator (MLE)*, defined as the parameter $\theta$ that maximises the likelihood:
-
+Quite frequently, one has no a priori idea about the value of $\theta$ (apart, perhaps, from certain limits). In this case, the prior $P(\theta)$ might be taken to be a constant (also known as a *flat* prior) and the MAP solution can be found by maximising the likelihood. This parameter solution is known as the *maximum likelihood estimator (MLE)*,
 \begin{equation}
   \hat\theta_{\rm MLE} = \underset{\theta}{\arg\max}\,\mathcal{L}(\theta|D).
   \label{eq:MLE}
 \end{equation}
 
-The MLE owes its importance to the fact, that it represents the most probable model parameter(s), given a flat prior, $P(\theta)=\rm const$, as a direct consequence of Bayes theorem. As detailed by Kendall \& Stuart (1979, ``The Advanced Theory of Statistics''), the MLE has three remarkable asymptotic properties which make it a powerful statistical tool. As the sample size becomes increasingly large, the MLE becomes a *consistent* (i.e. its expectation converges),  *minimum-variance estimator* and *normally distributed estimator*.
-
-It is generally convenient to work with its natural logarithm, called the *log-likelihood*,
+Note that it is generally convenient to work with the natural logarithm of the likelihood, called the *log-likelihood*,
 \begin{equation}
   \ell(\theta;D)\equiv\ln\mathcal{L}(\theta;D).
 \end{equation}
@@ -145,7 +107,96 @@ The logarithm conveniently transforms the product of probabilities into sums of 
 
 Since the logarithm is a monotonic function, a maximum of $\mathcal{L}$ is also a maximum of $\ell$ and vice versa. Hence, $\hat\theta_{\rm MLE}$ can be obtained either through maximising $\mathcal{L}$ or $\ell$.
 
-### Example: fitting a black-body spectrum
+## Laplace approximation
+
+We now turn to the problem of approximating the statistical uncertainty of the MAP/MLE. The following formalism is specific to the MLE, but it suffices to replace the likelihood for the product of the likelihood and the prior to write the analogous equations for the MAP.
+
+In general, $\ell(\theta;\mathbf{x})$ can be a complicated function of $\theta$. However, it is generally true that the lowest-order non-vanishing approximation of its shape around the absolute maximum $\hat\theta_{\rm MLE}$ is the second order term in the Taylor expansion. If $\theta$ is a single parameter,
+\begin{equation}\label{eq:loglexpainsion}
+  \ell(\theta;\mathbf{x}) = \ell(\hat\theta_{\rm MLE};\mathbf{x})-\tfrac{1}{2}\sigma^{-2}(\theta-\hat\theta_{\rm MLE})^2+\mathcal{O}\big((\theta-\hat\theta_{\rm MLE})^3\big),
+\end{equation}
+where, for the moment, $-\sigma^{-2}$ is just a funny way of writing the second-order Taylor coefficient, computed as
+\begin{equation}
+  -\sigma^{-2} = \left.\frac{d^2\ell{(\theta;\mathbf{x})}}{d\theta^2}\right|_{\theta=\hat\theta_{\rm MLE}}
+\end{equation}
+
+Since the second derivative at the maximum point is always negative, $\sigma$ is a well-defined positive real. This parabolic approximation of $\ell$ corresponds to the Gaussian approximation
+\begin{equation}
+  \mathcal{L}(\theta;\mathbf{x}) \approx \mathcal{L}(\hat\theta_{\rm MLE};\mathbf{x})\exp\left(-\frac{(\theta-\hat\theta_{\rm MLE})^2}{2\sigma^2}\right)
+\end{equation}
+with standard deviation $\sigma$ (hence use of the symbol $-\sigma^{-2}$ in Eq. \ref{eq:loglexpainsion}). By normalising this Gaussian, we obtain the normal parameter PDF (assuming a flat prior $P(\theta)=\rm constant$),
+\begin{equation}
+  P(\theta|\mathbf{x}) \approx \frac{1}{\sqrt{2\pi}\sigma}\exp\left(-\frac{(\theta-\hat\theta_{\rm MLE})^2}{2\sigma^2}\right).
+\end{equation}
+
+This approximation of the model uncertainty is known as the *Laplace approximation*. This normal approximation of $\mathcal{L}$ often works surprisingly well in real examples as a consequence of the CLT.
+
+The extension of the Laplace approximation to multivariate likelihood functions, i.e. where $\theta$ is a vector of parameters, is straightforward. In this case the covariance of the model parameters at the MLE solution is given by
+\begin{equation}
+  \Sigma = -\mathcal{H}(\hat\theta_{\rm MLE})^{-1},
+\end{equation}
+where $\mathcal{H}$ is the *Hessian matrix*,
+\begin{equation}
+  \mathcal{H}_{ij}(\theta) = \frac{\partial^2\ell{(\theta;\mathbf{x})}}{\partial\theta_i\partial\theta_j}.
+\end{equation}
+
+Since $\mathcal{H}(\hat\theta_{\rm MLE})$ is a symmetric negative-definite matrix, the covariance exists and is a symmetric and positive-definite matrix, as it must be.
+
+## Example 2: Mass measurement
+
+You need to determine the mass $M$ of an astrophysical objects by counting the number of photons of a certain wavelength observed in a fixed exposure time. This is a fairly standard situation. Think, for instance, of the case of inferring the neutral atomic hydrogen (HI) mass of a galaxy by measuring its rest-frame 21cm emission of the hyperfine hydrogen atom in the electron ground state.
+
+You know three things:
+
+* On average, a mass of $10^9\rm M_\odot$ produces *one* photon count during the exposure time.
+
+* You have counted 20 photons.
+
+* The mass function of the object is $\phi(M)\propto M^{-1.8}$.
+
+The last point means that the mean number of objects per comoving volume and per unit log-mass $x=\log_{10}(M/\rm M_\odot)$ is known to decline with increasing mass as $M^{-1.8}$ (roughly the mass function of dark matter haloes below the characteristic break).
+
+What is the mass of the object you are observing?
+
+One might think that 20 photons, each corresponding to a mass of $10^9\rm M_\odot$, simply implies a mass of $2\cdot 10^{10}\rm M_\odot$ as the most probable answer. This is in fact the maximum likelihood estimator: the probability of counting $k=20$ photons given $\lambda=M/10^9\rm M_\odot$ mass units follows a Poisson distribution, $$\mathcal{L}(M)=P(M|k)=\frac{\lambda^k e^{-\lambda}}{k!}.$$
+The maximum of this likelihood occurs indeed at $M=2\cdot 10^{10}\rm M_\odot$, i.e. $\lambda=20$.
+
+However, this solution ignores our prior knowledge. The proper Bayesian approach models the probability $P(M|D)$ that the object has a mass $M$, given the data and the prior: $$P(M|D)\propto\mathcal{L}(M)\cdot P(M)\propto\frac{\lambda^k e^{-\lambda}}{k!}\cdot M^{-1.8}.$$ Let's do this numerically:
+
+```{r}
+likelihood = function(M) dpois(20,M/10^9)
+prior = function(M) M^(-1.8) # (not normalized)
+marglikelihood = integrate(function(M) likelihood(M)*prior(M),1e8,1e11)$value
+posterior = function(M) likelihood(M)*prior(M)/marglikelihood
+```
+
+Let's check if the posterior is normalised:
+```{r}
+integrate(posterior,1e8,1e12)
+```
+Looks good. So let's now plot the posterior and determine the MAP solution
+```{r, out.width='70%', fig.align='center'}
+mass.mle = optimise(likelihood,c(3e9,1e11),maximum=TRUE)$maximum
+mass.map = optimise(posterior,c(3e9,1e11),maximum=TRUE)$maximum
+sigma = sqrt(-1/fderiv(function(m) log(posterior(m)),mass.map,2,h=1e5))
+laplace = function(m) posterior(mass.map)*exp(-(m-mass.map)^2/(2*sigma^2))
+sprintf('MLE solution: M = %.2e Msun',mass.mle)
+sprintf('MAP solution: M = %.2e+-%.2e Msun',mass.map,sigma)
+magcurve(posterior,3e9,1e11,n=300,log='x',lwd=2,yaxt='n',
+         xlab='Mass [Msun]',ylab='Posterior probability')
+abline(v=c(mass.map,mass.mle),lty=c(2,3))
+curve(laplace,add=T,col='orange',lty=2) # Laplace approximation
+```
+
+Interestingly, most probable mass, i.e. the maximum (dashed line) of the posterior probability (solid line), lies below the mass that is normally expected to emit the number of photons received (dotted line)! This is an interesting ramification of the steepness of the mass function, known as *Eddington bias*.
+
+Notes:
+
+* It is slightly more standard and better in terms of the Laplace approximation to express the likelihood, posterior and uncertainties in log-mass units rather than linear masses.
+
+* In principle, we could have skipped the normalisation by the marginal likelihood in this example, since it has no bearing on the maximum point.
+
+## Example 3: Black-body spectrum
 
 Let us now consider an example of a multivariate inference problem, i.e. a problem where we aim to constrain multiple (here two) parameters simultaneously from the same data.
 
@@ -167,9 +218,11 @@ Assuming a black-body, the energy radiated per unit wavelength over the duration
 \begin{equation}
   F(\lambda;T,A) =\frac{10^{-40}{\rm J m^4}A}{\lambda^5}\frac{1}{ e^{\frac{hc}{\lambda k_{\rm B}T}} - 1}~~\rm[J/m],
 \end{equation}
-where $h$ is the Planck constant, $c$ is the speed of light and $k_{\rm B}$ is the Boltzmann constant. The model has two parameters: the temperature $T$ and an amplitude $A$, which depends on the geometry and the quantum efficiency of the system, as well as on the duration of the measurement. We assume that $A$ is independent of the wavelength. The constant $10^{-40}\rm J m^4$ is an arbitrary scaling factor to make $A$ dimensionless and avoid very small values, which could lead to some unnecessary numerical difficulties. Our goal is to determine the most likely values of $T$ and $A$ and their uncertainties. Throughout this exercise we assume that the spectrum of the thermal source is constant over the small bandpass $\Delta\lambda$ of the filters.
+where $h$ is the Planck constant, $c$ is the speed of light and $k_{\rm B}$ is the Boltzmann constant. The model has two parameters: the temperature $T$ and an amplitude $A$, which depends on the geometry and the quantum efficiency of the system, as well as on the duration of the measurement. We assume that $A$ is independent of the wavelength. The constant $10^{-40}\rm J m^4$ is an arbitrary scaling factor to make $A$ dimensionless and avoid very small values, which could lead to some unnecessary numerical difficulties.
 
-Let's first write down the likelihood for a single narrow band filter $i$: The probability $P_i$ of observing $x_i$ photons at wavelength $\lambda_i\pm\Delta\lambda/2$ is given by the Poisson statistics $$\mathcal{L}_i(T,A;x_i) = P_i(x_i|T,A) = \frac{k_i^{x_i}e^{-k_i}}{x_i!},$$ where $k_i$ is the expected number of photons (of energy $E=hc/\lambda_i$) seen through the filter centred at $\lambda_i$, $$k_i=\Delta\lambda\cdot F(\lambda_i;T,A)\cdot\frac{\lambda_i}{hc},$$ which is dimensionless as required.
+Our goal is to determine the most likely values of $T$ and $A$ and their uncertainties. We assume flat priors on both parameters, such that the MLE and MAP soluition are identical.
+
+Let's first write down the likelihood for a single narrow band filter $i$: The probability $P_i$ of observing $x_i$ photons at wavelength $\lambda_i\pm\Delta\lambda/2$ is given by the Poisson statistics $$\mathcal{L}_i(T,A;x_i) = P_i(x_i|T,A) = \frac{k_i^{x_i}e^{-k_i}}{x_i!},$$ where $k_i$ is the expected number of photons (of energy $E=hc/\lambda_i$) seen through the filter centred at $\lambda_i$, $$k_i=\Delta\lambda\cdot F(\lambda_i;T,A)\cdot\frac{\lambda_i}{hc},$$ which is dimensionless as required. We here assumed the spectrum of the thermal source to be constant over the small bandpass $\Delta\lambda$ of the filters -- a slight approximation that can easily be justified given the large undertainties of the measurements (just a few photons).
 
 Hence, the total log-likelihood function becomes
 \begin{equation}
@@ -215,7 +268,7 @@ A.mle = fit$par[2]
 cat(sprintf('MLE solution: T = %.3eK, A = %.3e\n',T.mle,A.mle))
 ```
 
-We have used the in-built **optim** function to maximise the likelihood. A detailed discussion of this function was given in part 2 of this course.
+We have used the in-built **optim** function to maximise the likelihood. The argument *hessian=TRUE* forces this function to return the Hessian matrix at the maximum point, which we will need to compute the parameter covariance in the Laplace approximation.
 
 Let us now plot the most likely SED together with the data points and their Poisson uncertainties.
 
@@ -229,47 +282,10 @@ segments(data.wavelength,
          y0=qpois(0.16,data.counts),y1=qpois(0.84,data.counts)) # 16%-84% uncertainties
 ```
 
-# Model parameter uncertainties
-
-We now turn to the problem of estimating the statistical uncertainty of the MLE.
-
-In general, $\ell(\theta;\mathbf{x})$ can be a complicated function of $\theta$. However, it is generally true that the lowest-order non-vanishing approximation of its shape around the absolute maximum $\hat\theta_{\rm MLE}$ is the second order term in the Taylor expansion. If $\theta$ is a single parameter,
-\begin{equation}\label{eq:loglexpainsion}
-  \ell(\theta;\mathbf{x}) = \ell(\hat\theta_{\rm MLE};\mathbf{x})-\tfrac{1}{2}\sigma^{-2}(\theta-\hat\theta_{\rm MLE})^2+\mathcal{O}\big((\theta-\hat\theta_{\rm MLE})^3\big),
-\end{equation}
-where, for the moment, $-\sigma^{-2}$ is just a funny way of writing the second-order Taylor coefficient, computed as
-\begin{equation}
-  -\sigma^{-2} = \left.\frac{d^2\ell{(\theta;\mathbf{x})}}{d\theta^2}\right|_{\theta=\hat\theta_{\rm MLE}}
-\end{equation}
-
-Since the second derivative at the maximum point is always negative, $\sigma$ is a well-defined positive real. This parabolic approximation of $\ell$ corresponds to the Gaussian approximation
-\begin{equation}
-  \mathcal{L}(\theta;\mathbf{x}) \approx \mathcal{L}(\hat\theta_{\rm MLE};\mathbf{x})\exp\left(-\frac{(\theta-\hat\theta_{\rm MLE})^2}{2\sigma^2}\right)
-\end{equation}
-with standard deviation $\sigma$ (hence use of the symbol $-\sigma^{-2}$ in Eq. \ref{eq:loglexpainsion}). By normalising this Gaussian, we obtain the normal parameter PDF (assuming a flat prior $P(\theta)=\rm constant$),
-\begin{equation}
-  P(\theta|\mathbf{x}) \approx \frac{1}{\sqrt{2\pi}\sigma}\exp\left(-\frac{(\theta-\hat\theta_{\rm MLE})^2}{2\sigma^2}\right).
-\end{equation}
-
-This approximation of the model uncertainty is known as the *Laplace approximation*. This normal approximation of $\mathcal{L}$ often works surprisingly well in real examples as a consequence of the CLT.
-
-The extension of the Laplace approximation to multivariate likelihood functions, i.e. where $\theta$ is a vector of parameters, is straightforward. In this case the covariance of the model parameters at the MLE solution is given by
-\begin{equation}
-  \Sigma = -\mathcal{H}(\hat\theta_{\rm MLE})^{-1},
-\end{equation}
-where $\mathcal{H}$ is the *Hessian matrix*,
-\begin{equation}
-  \mathcal{H}_{ij}(\theta) = \frac{\partial^2\ell{(\theta;\mathbf{x})}}{\partial\theta_i\partial\theta_j}.
-\end{equation}
-
-Since $\mathcal{H}(\hat\theta_{\rm MLE})$ is a symmetric negative-definite matrix, the covariance exists and is a symmetric and positive-definite matrix, as it must be.
-
-### Example: fitting a black-body spectrum (continued)
-
-The parameter covariance in the Laplace approximation can be obtained from the Hessian, which is computed directly by **optim** if the argument *hessian=TRUE* is set.
+Finally, we visualize the parameter uncertainties:
 
 ```{r, out.width='70%', fig.align='center'}
-# plot MLE solution
+# Plot MLE solution
 xlim = c(5e3,1.3e4) # needed again later
 ylim = c(0,2.5e3) # needed again later
 magplot(T.mle,A.mle,xlim=xlim,ylim=ylim,pch=20,xaxs='i',yaxs='i',
@@ -297,6 +313,19 @@ contour(x.range,y.range,z,levels=contourlevel(z,c(0.68,0.95)), lty=c(1,2),
         drawlabels=FALSE, add=TRUE, col='magenta')
 ```
 
-Note that the 2-$\sigma$ ellipse of the Laplace approximation reaches to $A<0$, which is clearly unphysical. For more accurate posteriors, we need to consider the full likelihood and identify the minimal regions that contain 68\% and 95\% of the probability mass, respectively. In this example, this can be done numerically on a grid (magenta). In general, higher-dimensional problems, more sophisticated techniques are required (e.g. MCMC), which usually produce a sample representing the posterior (see later in this course).
+Note that the 2-$\sigma$ ellipse of the Laplace approximation reaches to $A<0$, which is clearly non-physical. For more accurate posteriors, we need to consider the full likelihood and identify the minimal regions that contain 68\% and 95\% of the probability mass, respectively. In this example, this can be done numerically on a grid (magenta). In general, higher-dimensional problems, more sophisticated techniques are required (e.g. MCMC), which usually produce a sample representing the posterior (see later in this course).
 
-# Imortant resources
+## Example 4: Lines/planes/hyper-planes
+
+This last example shows how to solve a three-parameter model: we like to fit the stellar mass-size relation of disk galaxies in the local universe via a power law (two parameters) and log-normal intrinsic scatter (3rd parameter), given data with heteroscedastic measurement uncertainties.
+
+This and higher-dimensional linear fits can be handled by the **hyper.fit** package. Here, I only give one brief example and refer the reader to our paper "Hyper-Fit: Fitting Linear Models to Multidimensional Data with Multivariate Gaussian Uncertainties" (https://arxiv.org/abs/1508.02145).
+
+```{r, out.width='70%', fig.align='center'}
+data(GAMAsmVsize)
+plot(hyper.fit(GAMAsmVsize[,c('logmstar', 'logrekpc')],
+               vars=GAMAsmVsize[,c('logmstar_err','logrekpc_err')]^2,
+               weights=GAMAsmVsize[,'weights']))
+```
+
+You can produce such fits online (https://hyperfit.icrar.org).
