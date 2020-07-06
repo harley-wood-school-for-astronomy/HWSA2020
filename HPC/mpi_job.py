@@ -77,8 +77,8 @@ def distributed_processing(filenames, processing_func=None,
 
     if rank == 0:
         t1 = time.perf_counter()
-        print(f"[Rank={rank}]: Converting nfiles = {nfiles} over "\
-              f"ntasks = {ntasks}...done. Time taken = {t1-tstart:0.3f} seconds")
+        print(f"[Rank={rank}]: Converting nfiles = {nfiles} over ntasks = "\
+              f"{ntasks}...done. Time taken = {t1-tstart:0.3f} seconds")
 
     return True
 
